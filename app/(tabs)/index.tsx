@@ -1,0 +1,136 @@
+// app/index.tsx
+import React, { useState } from "react";
+import {
+  View,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  StyleSheet,
+  SafeAreaView,
+  ActivityIndicator,
+  Platform,
+} from "react-native";
+import { useRouter } from "expo-router";
+import axios from "axios";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { COLORS } from "./theme";
+
+const BASE_URL =
+  Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://127.0.0.1:5000";
+
+export default function LoginScreen() {
+  const router = useRouter();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [loading, setLoading] = useState(false);
+
+  const handleLogin = async () => {
+    if (!email || !password) return alert("กรอก Email/Password");
+    setLoading(true);
+    try {
+      // ✅ เคลียร์ token เก่าออกก่อน (กัน token ค้างจาก user อื่น)
+      await AsyncStorage.multiRemove(["token", "user_id"]);
+
+      const res = await axios.post(`${BASE_URL}/api/login`, {
+        email,
+        password,
+      });
+
+      // ✅ เก็บ token และ user_id ใหม่
+      await AsyncStorage.setItem("token", res.data.token);
+      await AsyncStorage.setItem("user_id", String(res.data.user_id));
+
+      console.log("✅ Login success:", res.data.user_id);
+      router.replace("/home");
+    } catch (e: any) {
+      alert(e.response?.data?.error || "เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <View style={styles.card}>
+        <Text style={styles.logo}>
+          FAST<Text style={{ color: COLORS.accent }}>GIG</Text>
+        </Text>
+        <Text style={styles.caption}>Welcome to FASTGIG</Text>
+
+        <Text style={styles.label}>Email</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter Your Email"
+          autoCapitalize="none"
+          value={email}
+          onChangeText={setEmail}
+        />
+
+        <Text style={styles.label}>Password</Text>
+        <TextInput
+          style={styles.input}
+          placeholder="Enter Your Password"
+          secureTextEntry
+          value={password}
+          onChangeText={setPassword}
+        />
+
+        <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
+          {loading ? (
+            <ActivityIndicator color="#fff" />
+          ) : (
+            <Text style={styles.primaryBtnText}>Continue</Text>
+          )}
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          onPress={() => router.push("/register")}
+          style={{ marginTop: 14 }}
+        >
+          <Text style={styles.link}>
+            Don’t have an account?{" "}
+            <Text style={{ color: COLORS.accent }}>Sign Up</Text>
+          </Text>
+        </TouchableOpacity>
+      </View>
+    </SafeAreaView>
+  );
+}
+
+const styles = StyleSheet.create({
+  safe: {
+    flex: 1,
+    backgroundColor: COLORS.primary,
+    justifyContent: "center",
+    padding: 20,
+  },
+  card: {},
+  logo: {
+    fontSize: 32,
+    color: "#fff",
+    textAlign: "center",
+    fontFamily: "Kanit_800ExtraBold",
+  },
+  caption: { textAlign: "center", color: "#EAEAF4", marginBottom: 24 },
+  label: { color: "#fff", marginBottom: 6, fontFamily: "Kanit_600SemiBold" },
+  input: {
+    backgroundColor: "#fff",
+    borderRadius: 10,
+    paddingHorizontal: 12,
+    paddingVertical: 10,
+    marginBottom: 12,
+  },
+  primaryBtn: {
+    backgroundColor: "#7B61FF",
+    padding: 14,
+    borderRadius: 10,
+    marginTop: 6,
+  },
+  primaryBtnText: {
+    color: "#fff",
+    textAlign: "center",
+    fontFamily: "Kanit_600SemiBold",
+    fontSize: 16,
+  },
+  link: { color: "#fff", textAlign: "center" },
+});
