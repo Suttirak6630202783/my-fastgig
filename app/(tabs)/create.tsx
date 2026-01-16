@@ -13,11 +13,7 @@ import { useRouter, useLocalSearchParams } from "expo-router";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { COLORS } from "./theme";
-
-const BASE_URL =
-  Platform.OS === "android"
-    ? "http://10.0.2.2:5000" // สำหรับ Android Emulator
-    : "http://127.0.0.1:5000";
+import { BASE_URL, AI_URL } from "./config";
 
 export default function CreateJobsScreen() {
   const router = useRouter();

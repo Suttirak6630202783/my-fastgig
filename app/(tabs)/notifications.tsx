@@ -12,9 +12,7 @@ import {
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Ionicons } from "@expo/vector-icons";
-
-const BASE_URL =
-  Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://127.0.0.1:5000";
+import { BASE_URL, AI_URL } from "./config";
 
 // ✅ ตัด is_read ออก
 type Notification = {

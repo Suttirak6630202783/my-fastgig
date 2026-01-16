@@ -17,9 +17,7 @@ import * as ImagePicker from "expo-image-picker";
 import axios from "axios";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router"; // ✅ เพิ่ม
-
-const BASE_URL =
-  Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://127.0.0.1:5000";
+import { BASE_URL, AI_URL } from "./config";
 
 // ✅ fallback: คำนวณระดับจากคะแนน (ใช้เมื่อ API ยังไม่ส่ง trust_level)
 function getTrustMeta(points: number) {

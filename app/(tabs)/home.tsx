@@ -16,12 +16,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
 import { COLORS } from "./theme";
-
-const BASE_URL =
-  Platform.OS === "android" ? "http://10.0.2.2:5000" : "http://127.0.0.1:5000";
-
-const AI_URL =
-  Platform.OS === "android" ? "http://10.0.2.2:5001" : "http://127.0.0.1:5001";
+import { BASE_URL, AI_URL } from "./config";
 
 /** axios instance สำหรับ AI + timeout */
 const ai = axios.create({ baseURL: AI_URL, timeout: 10000 });

@@ -129,7 +129,6 @@ const upload = multer({ storage });
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 
 // ---------------- Register ----------------
-// ---------------- Register ----------------
 app.post("/api/register", async (req, res) => {
   try {
     let { full_name, email, password, confirmPassword, phone, age, skills } =
