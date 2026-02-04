@@ -1,14 +1,14 @@
 // app/(tabs)/_layout.tsx
-import { Tabs } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
 import {
-  useFonts,
   Kanit_400Regular,
   Kanit_500Medium,
   Kanit_600SemiBold,
   Kanit_700Bold,
   Kanit_800ExtraBold,
+  useFonts,
 } from "@expo-google-fonts/kanit";
+import { Ionicons } from "@expo/vector-icons";
+import { Tabs } from "expo-router";
 import { Text } from "react-native";
 import { COLORS } from "./theme";
 

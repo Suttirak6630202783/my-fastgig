@@ -1,22 +1,21 @@
 // app/home.tsx
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
   FlatList,
-  TouchableOpacity,
   Image,
+  SafeAreaView,
+  StyleSheet,
+  Text,
   TextInput,
-  Platform,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
-import { Ionicons } from "@expo/vector-icons";
+import { AI_URL, BASE_URL } from "./config";
 import { COLORS } from "./theme";
-import { BASE_URL, AI_URL } from "./config";
 
 /** axios instance สำหรับ AI + timeout */
 const ai = axios.create({ baseURL: AI_URL, timeout: 10000 });
@@ -341,8 +340,8 @@ export default function HomeScreen() {
               {item.location_text && item.location_text.trim() !== ""
                 ? item.location_text
                 : item.distance_km
-                ? `${item.distance_km.toFixed(1)} กม.`
-                : "ไม่ระบุสถานที่"}
+                  ? `${item.distance_km.toFixed(1)} กม.`
+                  : "ไม่ระบุสถานที่"}
             </Text>
           </View>
         </View>

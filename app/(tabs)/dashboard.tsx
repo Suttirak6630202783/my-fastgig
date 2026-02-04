@@ -1,21 +1,20 @@
 // app/dashboard.tsx
-import React, { useEffect, useMemo, useState, useCallback } from "react";
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import { useRouter } from "expo-router";
+import React, { useCallback, useEffect, useMemo, useState } from "react";
 import {
-  View,
-  Text,
-  SafeAreaView,
-  StyleSheet,
-  Platform,
+  Alert,
   FlatList,
   RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
   TouchableOpacity,
-  Alert,
+  View,
 } from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { BASE_URL, AI_URL } from "./config";
+import { BASE_URL } from "./config";
 
 type JobSummaryRow = { status_code: string; total_jobs: number };
 
@@ -31,7 +30,7 @@ export default function Dashboard() {
       const token = await AsyncStorage.getItem("token");
       const res = await axios.get<JobSummaryRow[]>(
         `${BASE_URL}/api/admin/job-summary`,
-        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined
+        token ? { headers: { Authorization: `Bearer ${token}` } } : undefined,
       );
       setRows(res.data || []);
     } catch (e: any) {

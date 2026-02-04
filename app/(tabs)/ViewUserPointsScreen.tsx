@@ -1,19 +1,18 @@
 // app/ViewUserPointsScreen.tsx
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  SafeAreaView,
-  StyleSheet,
-  TouchableOpacity,
-  FlatList,
-  Platform,
-  ActivityIndicator,
-  TextInput,
-} from "react-native";
 import axios from "axios";
 import { useRouter } from "expo-router";
-import { BASE_URL, AI_URL } from "./config";
+import React, { useEffect, useState } from "react";
+import {
+  ActivityIndicator,
+  FlatList,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { BASE_URL } from "./config";
 
 type Row = {
   user_id: number;
@@ -53,8 +52,8 @@ export default function ViewUserPointsScreen() {
       item.total_points > 0
         ? "#32CD32"
         : item.total_points < 0
-        ? "#FF4500"
-        : "#666";
+          ? "#FF4500"
+          : "#666";
     return (
       <View style={styles.card}>
         <View style={{ flexDirection: "row", justifyContent: "space-between" }}>

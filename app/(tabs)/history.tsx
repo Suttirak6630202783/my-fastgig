@@ -1,19 +1,18 @@
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import { useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
+  FlatList,
+  Modal,
   SafeAreaView,
   StyleSheet,
+  Text,
   TouchableOpacity,
-  FlatList,
-  Platform,
-  Modal,
+  View,
 } from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router";
+import { BASE_URL } from "./config";
 import { COLORS } from "./theme";
-import { BASE_URL, AI_URL } from "./config";
 
 export default function HistoryPage() {
   const router = useRouter();

@@ -1,19 +1,18 @@
-import React, { useState, useEffect } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
 import {
-  View,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  Platform,
+  View,
 } from "react-native";
-import { useRouter, useLocalSearchParams } from "expo-router";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BASE_URL } from "./config";
 import { COLORS } from "./theme";
-import { BASE_URL, AI_URL } from "./config";
 
 export default function CreateJobsScreen() {
   const router = useRouter();
@@ -60,7 +59,7 @@ export default function CreateJobsScreen() {
           age_min: ageMin,
           age_max: ageMax,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("✅ สร้างงานสำเร็จแล้ว!");
       router.replace("/home");
@@ -85,7 +84,7 @@ export default function CreateJobsScreen() {
           age_min: ageMin,
           age_max: ageMax,
         },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       alert("✅ แก้ไขงานสำเร็จ!");
       router.replace("/home");

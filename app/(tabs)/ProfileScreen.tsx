@@ -1,23 +1,23 @@
 // app/ProfileScreen.tsx
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import * as ImagePicker from "expo-image-picker";
+import { useRouter } from "expo-router"; // ✅ เพิ่ม
 import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  Image,
-  TouchableOpacity,
-  Alert,
-  Platform,
   ActivityIndicator,
-  TextInput,
+  Alert,
+  Image,
+  Platform,
+  SafeAreaView,
   ScrollView,
+  StyleSheet,
+  Text,
+  TextInput,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import * as ImagePicker from "expo-image-picker";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useRouter } from "expo-router"; // ✅ เพิ่ม
-import { BASE_URL, AI_URL } from "./config";
+import { BASE_URL } from "./config";
 
 // ✅ fallback: คำนวณระดับจากคะแนน (ใช้เมื่อ API ยังไม่ส่ง trust_level)
 function getTrustMeta(points: number) {
@@ -193,7 +193,7 @@ export default function ProfileScreen() {
       await axios.put(
         `${BASE_URL}/api/me`,
         { full_name: username, age, skills, phone },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       Alert.alert("✅ บันทึกแล้ว");

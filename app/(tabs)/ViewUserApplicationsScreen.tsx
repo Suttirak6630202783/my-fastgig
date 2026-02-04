@@ -1,17 +1,16 @@
 // app/ViewUserApplicationsScreen.tsx
+import axios from "axios";
 import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
+  ActivityIndicator,
+  FlatList,
   SafeAreaView,
   StyleSheet,
+  Text,
   TouchableOpacity,
-  FlatList,
-  Platform,
-  ActivityIndicator,
+  View,
 } from "react-native";
-import axios from "axios";
-import { BASE_URL, AI_URL } from "./config";
+import { BASE_URL } from "./config";
 
 type Row = {
   application_id: number;
@@ -33,7 +32,7 @@ export default function ViewUserApplicationsScreen() {
       setLoading(true);
       const qs = status === "ALL" ? "" : `?status=${status}`;
       const res = await axios.get(
-        `${BASE_URL}/api/view/user-applications${qs}`
+        `${BASE_URL}/api/view/user-applications${qs}`,
       );
       setRows(res.data || []);
     } catch (e: any) {

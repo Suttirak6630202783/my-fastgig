@@ -1,23 +1,22 @@
 // app/ApplicantsListScreen.tsx
-import React, { useEffect, useState, useCallback } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
-  TouchableOpacity,
-  Alert,
-  Modal,
-  Platform,
-  RefreshControl,
-} from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
 import { useNavigation } from "@react-navigation/native";
-import { BASE_URL, AI_URL } from "./(tabs)/config";
+import axios from "axios";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useCallback, useEffect, useState } from "react";
+import {
+  Alert,
+  FlatList,
+  Modal,
+  RefreshControl,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { BASE_URL } from "./(tabs)/config";
 
 export default function ApplicantsListScreen() {
   const router = useRouter();
@@ -63,7 +62,7 @@ export default function ApplicantsListScreen() {
       await axios.post(
         `${BASE_URL}/api/applications/${id}/accept`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       Alert.alert("✅ ตอบรับผู้สมัครแล้ว");
       fetchApplicants();
@@ -84,7 +83,7 @@ export default function ApplicantsListScreen() {
       await axios.post(
         `${BASE_URL}/api/applications/${id}/reject`,
         {},
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
       Alert.alert("❌ ปฏิเสธผู้สมัครแล้ว");
       fetchApplicants();
@@ -105,14 +104,14 @@ export default function ApplicantsListScreen() {
       const res = await axios.post(
         `${BASE_URL}/api/applications/${targetApp}/complete`,
         { result: selectedResult },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       const completedJobs = res.data.completed_jobs ?? 0;
 
       Alert.alert(
         "🎉 ยืนยันงานเสร็จสิ้นแล้ว",
-        `ตอนนี้ผู้สมัครคนนี้ทำงานสำเร็จทั้งหมด ${completedJobs} งาน`
+        `ตอนนี้ผู้สมัครคนนี้ทำงานสำเร็จทั้งหมด ${completedJobs} งาน`,
       );
 
       setModalVisible(false);
@@ -241,8 +240,8 @@ export default function ApplicantsListScreen() {
                   {r === "pass"
                     ? "ผ่าน (+10)"
                     : r === "ok"
-                    ? "พอใช้ (+5)"
-                    : "ไม่ผ่าน (-5)"}
+                      ? "พอใช้ (+5)"
+                      : "ไม่ผ่าน (-5)"}
                 </Text>
               </TouchableOpacity>
             ))}

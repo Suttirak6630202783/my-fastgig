@@ -1,9 +1,9 @@
-// ai_service_skill_intent_pro.js — DEBUG FRIENDLY EDITION (SQL Server)
-import express from "express";
-import cors from "cors";
-import sql from "mssql";
+// ai_service_skill_intent_pro.js — MySQL EDITION ✅
 import { pipeline } from "@xenova/transformers";
+import cors from "cors";
 import dotenv from "dotenv";
+import express from "express";
+import mysql from "mysql2/promise"; // ✅ เปลี่ยนเป็น mysql2
 dotenv.config();
 
 const app = express();
@@ -17,24 +17,28 @@ let EMBED_READY = false;
 app.get("/_health", (_req, res) => {
   res.json({ ok: DB_READY && EMBED_READY, db: DB_READY, embed: EMBED_READY });
 });
-app.get("/", (_req, res) => res.send("AI service alive"));
+app.get("/", (_req, res) => res.send("AI service alive (MySQL Version)"));
 
-/* ---------- Database (MSSQL + Adapter) ---------- */
-const dbConfig = {
-  user: process.env.DB_USER,
-  password: process.env.DB_PASSWORD,
-  server: process.env.DB_HOST, // e.g. 127.0.0.1
-  database: process.env.DB_NAME,
-  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : undefined, // e.g. 1434
-  options: { encrypt: false, trustServerCertificate: true },
-};
+/* ---------- Database (MySQL Connection) ---------- */
+// ✅ ใช้ Config เดียวกับ server.js
+const pool = mysql.createPool({
+  host: process.env.DB_HOST || "localhost",
+  user: process.env.DB_USER || "root",
+  password: process.env.DB_PASSWORD || "",
+  database: process.env.DB_NAME || "FastGig",
+  port: process.env.DB_PORT ? Number(process.env.DB_PORT) : 3306,
+  waitForConnections: true,
+  connectionLimit: 10,
+  queueLimit: 0,
+});
 
-const mssqlPoolPromise = new sql.ConnectionPool(dbConfig)
-  .connect()
-  .then((pool) => {
+// ✅ เช็คการเชื่อมต่อแบบ MySQL
+pool
+  .getConnection()
+  .then((conn) => {
     DB_READY = true;
-    console.log("✅ AI connected to SQL Server");
-    return pool;
+    console.log("✅ AI connected to MySQL Database");
+    conn.release();
   })
   .catch((err) => {
     DB_READY = false;
@@ -42,46 +46,20 @@ const mssqlPoolPromise = new sql.ConnectionPool(dbConfig)
     process.exit(1);
   });
 
-// query adapter ให้ใช้สไตล์ [rows] แบบ mysql2
-const pool = {
-  query: async (text, params = []) => {
-    const conn = await mssqlPoolPromise;
-    let sqlText = String(text);
-
-    // แปลง placeholder ? → @p1,@p2,...
-    let idx = 0;
-    const names = [];
-    sqlText = sqlText.replace(/\?/g, () => {
-      idx += 1;
-      const nm = `p${idx}`;
-      names.push(nm);
-      return `@${nm}`;
-    });
-
-    const request = conn.request();
-    params.forEach((val, i) => {
-      let type = sql.NVarChar;
-      if (val === null || val === undefined) type = sql.NVarChar;
-      else if (typeof val === "number")
-        type = Number.isInteger(val) ? sql.Int : sql.Float;
-      else if (typeof val === "boolean") type = sql.Bit;
-      else type = sql.NVarChar;
-      request.input(names[i], type, val);
-    });
-
-    const result = await request.query(sqlText);
-    return [result.recordset];
-  },
-};
-
 /* ---------- Load Model ---------- */
 console.log("⏳ Loading AI model...");
-const embedder = await pipeline(
-  "feature-extraction",
-  "Xenova/distiluse-base-multilingual-cased-v2"
-);
-EMBED_READY = true;
-console.log("✅ Model loaded successfully!");
+// โหลด Model (อาจใช้เวลาหน่อยในครั้งแรก)
+let embedder;
+try {
+  embedder = await pipeline(
+    "feature-extraction",
+    "Xenova/distiluse-base-multilingual-cased-v2",
+  );
+  EMBED_READY = true;
+  console.log("✅ Model loaded successfully!");
+} catch (err) {
+  console.error("❌ Failed to load AI Model:", err);
+}
 
 /* ---------- Utilities ---------- */
 function normalize(text = "") {
@@ -117,7 +95,7 @@ function cosine(a, b) {
   return denom ? dot / denom : 0;
 }
 
-/* ---------- หมวดงานหลัก ---------- */
+/* ---------- หมวดงานหลัก (เหมือนเดิม) ---------- */
 const CATS = [
   {
     tag: "อาหาร",
@@ -138,9 +116,9 @@ const CATS = [
     ],
   },
   {
-    tag: "ก่อสร้าง/ช่าง",
+    tag: "ก่อสร้าง",
     kws: [
-      "ช่าง",
+      "ช่างก่อสร้าง",
       "ก่อสร้าง",
       "ทาสี",
       "ซ่อม",
@@ -593,6 +571,7 @@ const CATS = [
       "ลงโปรแกรม",
       "IT Support",
       "Technician",
+      "ช่างคอม",
     ],
   },
   {
@@ -750,7 +729,6 @@ function filterJobsByCategory(jobs, tag) {
 }
 
 /* ---------- /api/match ---------- */
-/* ---------- /api/match (Debug Mode + guards) ---------- */
 const DEBUG_JSON = process.env.DEBUG_JSON === "1";
 
 app.post("/api/match", async (req, res) => {
@@ -762,14 +740,14 @@ app.post("/api/match", async (req, res) => {
       return res.status(400).json({ error: "user_id ต้องเป็นตัวเลข" });
     }
 
-    // 1) อ่านทักษะผู้ใช้
+    // 1) อ่านทักษะผู้ใช้ (MySQL ใช้ [rows])
     let user;
     try {
-      const [[u]] = await pool.query(
+      const [rows] = await pool.query(
         "SELECT skills FROM users WHERE user_id = ?",
-        [uid]
+        [uid],
       );
-      user = u;
+      user = rows[0];
     } catch (e) {
       console.error("DB error (read user):", e);
       return res.status(500).json({
@@ -808,23 +786,22 @@ app.post("/api/match", async (req, res) => {
     let jobs = [];
     try {
       const [rows] = await pool.query(`
-  SELECT
-    j.job_id,
-    j.title,
-    j.description,
-    j.pay_min,
-    j.pay_max,
-    j.age_min,
-    j.age_max,
-    j.location_text,
-    j.status_code,
-    -- ถ้าตารางมี owner_id/user_id ให้ JOIN เอาชื่อ/รูปมาด้วย
-    u.full_name,
-    u.profile_image
-  FROM jobs j
-  LEFT JOIN users u ON u.user_id = j.user_id  -- หรือ j.owner_id ถ้าคอลัมน์ชื่อนี้
-  WHERE j.status_code = 'OPEN'
-`);
+        SELECT
+            j.job_id,
+            j.title,
+            j.description,
+            j.pay_min,
+            j.pay_max,
+            j.age_min,
+            j.age_max,
+            j.location_text,
+            j.status_code,
+            u.full_name,
+            u.profile_image
+        FROM jobs j
+        LEFT JOIN users u ON u.user_id = j.user_id
+        WHERE j.status_code = 'OPEN'
+      `);
       jobs = rows || [];
     } catch (e) {
       console.error("DB error (read jobs):", e);
@@ -849,7 +826,7 @@ app.post("/api/match", async (req, res) => {
     try {
       const uvec = toArray((await embedder(userSkill))[0]);
       const jvecs = await Promise.all(
-        candidate.map((j) => embedder(`${j.title} ${j.description || ""}`))
+        candidate.map((j) => embedder(`${j.title} ${j.description || ""}`)),
       );
       const sims = jvecs.map((v) => cosine(uvec, toArray(v[0])));
       ranked = candidate
@@ -870,13 +847,11 @@ app.post("/api/match", async (req, res) => {
         job_id: j.job_id,
         title: j.title,
         similarity: (j.similarity || 0).toFixed(3),
-      }))
+      })),
     );
 
     return res.json({
-      message: `AI วิเคราะห์ว่าคุณเหมาะกับงานแนว “${tag}” (ความมั่นใจ ${(
-        confidence * 100
-      ).toFixed(1)}%) 🔎`,
+      message: `AI วิเคราะห์ว่าคุณเหมาะกับงานแนว “${tag}”`,
       jobs: ranked,
     });
   } catch (err) {
@@ -894,7 +869,7 @@ app.post("/api/chatbot", async (req, res) => {
     const { message } = req.body || {};
     if (!message || !message.trim()) {
       return res.json({
-        reply: "พิมพ์บอกผมหน่อยว่ากำลังหางานแนวไหนครับ 😊",
+        reply: "พิมพ์บอกผมหน่อยว่ากำลังหางานแนวไหนครับ",
         jobs: [],
       });
     }
@@ -908,14 +883,15 @@ app.post("/api/chatbot", async (req, res) => {
       if (confidence < 0.35) tag = "ไม่ระบุ";
     }
 
+    // ✅ ใช้ MySQL Query
     const [jobs] = await pool.query(
-      "SELECT job_id, title, description FROM jobs WHERE status_code='OPEN'"
+      "SELECT job_id, title, description FROM jobs WHERE status_code='OPEN'",
     );
     const jobList = tag === "ไม่ระบุ" ? jobs : filterJobsByCategory(jobs, tag);
 
     const qvec = toArray((await embedder(message))[0]);
     const jvecs = await Promise.all(
-      jobList.map((j) => embedder(`${j.title} ${j.description || ""}`))
+      jobList.map((j) => embedder(`${j.title} ${j.description || ""}`)),
     );
     const sims = jvecs.map((v) => cosine(qvec, toArray(v[0])));
 
@@ -928,7 +904,7 @@ app.post("/api/chatbot", async (req, res) => {
     res.json({
       reply:
         tag === "ไม่ระบุ"
-          ? `ผมยังไม่แน่ใจหมวดงานจากข้อความนี้ 😅 ลองพิมพ์ใหม่เช่น “อยากทำอาหารไทย” หรือ “อยากเขียนเว็บ”`
+          ? `ผมยังไม่แน่ใจหมวดงานจากข้อความนี้ ลองพิมพ์ใหม่เช่น “อยากทำอาหารไทย” หรือ “อยากเขียนเว็บ”`
           : `จากสิ่งที่คุณพิมพ์มา ผมคิดว่าคุณสนใจงานแนว “${tag}” (ความมั่นใจ ${(
               confidence * 100
             ).toFixed(1)}%) 🔎`,
@@ -941,12 +917,11 @@ app.post("/api/chatbot", async (req, res) => {
 });
 
 /* ---------- Run ---------- */
-// ✅ เปลี่ยนให้ใช้ AI_PORT (ไม่ใช้ PORT ของ API หลัก)
 const PORT = process.env.AI_PORT ? Number(process.env.AI_PORT) : 5001;
 console.log(
-  "🧩 FASTGIG AI v2.3 — Debug Mode Enabled:",
-  new Date().toLocaleString()
+  "FASTGIG AI v2.3 (MySQL Edition) — Debug Mode Enabled:",
+  new Date().toLocaleString(),
 );
 app.listen(PORT, () =>
-  console.log(`🚀 FastGig AI Service running at http://localhost:${PORT}`)
+  console.log(`FastGig AI Service running at http://localhost:${PORT}`),
 );

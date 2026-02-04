@@ -1,22 +1,21 @@
 // app/user-performance.tsx
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import { useRouter } from "expo-router";
 import React, { useCallback, useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  SafeAreaView,
-  StyleSheet,
-  Platform,
-  TouchableOpacity,
-  Alert,
   ActivityIndicator,
-  ScrollView,
+  Alert,
   RefreshControl,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
 } from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Ionicons } from "@expo/vector-icons";
-import { useRouter } from "expo-router";
-import { BASE_URL, AI_URL } from "./config";
+import { BASE_URL } from "./config";
 
 type Perf = {
   user_id: number;

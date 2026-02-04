@@ -1,20 +1,19 @@
 // app/index.tsx
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  SafeAreaView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ActivityIndicator,
-  Platform,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
+import { BASE_URL } from "./config";
 import { COLORS } from "./theme";
-import { BASE_URL, AI_URL } from "./config";
 
 export default function LoginScreen() {
   const router = useRouter();

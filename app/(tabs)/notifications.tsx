@@ -1,18 +1,17 @@
 // app/notifications.tsx
+import { Ionicons } from "@expo/vector-icons";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
 import React, { useEffect, useState } from "react";
 import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  FlatList,
   ActivityIndicator,
-  Platform,
+  FlatList,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  View,
 } from "react-native";
-import axios from "axios";
-import AsyncStorage from "@react-native-async-storage/async-storage";
-import { Ionicons } from "@expo/vector-icons";
-import { BASE_URL, AI_URL } from "./config";
+import { BASE_URL } from "./config";
 
 // ✅ ตัด is_read ออก
 type Notification = {

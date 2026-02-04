@@ -1,20 +1,19 @@
 // app/register.tsx
+import axios from "axios";
+import { useRouter } from "expo-router";
 import React, { useState } from "react";
 import {
-  View,
+  ActivityIndicator,
+  SafeAreaView,
+  ScrollView,
+  StyleSheet,
   Text,
   TextInput,
   TouchableOpacity,
-  StyleSheet,
-  SafeAreaView,
-  ScrollView,
-  ActivityIndicator,
-  Platform,
+  View,
 } from "react-native";
-import { useRouter } from "expo-router";
-import axios from "axios";
+import { BASE_URL } from "./config";
 import { COLORS } from "./theme";
-import { BASE_URL, AI_URL } from "./config";
 
 export default function RegisterScreen() {
   const router = useRouter();

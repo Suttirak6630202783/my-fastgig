@@ -1,20 +1,19 @@
 // app/job-detail.tsx
-import React, { useEffect, useState } from "react";
-import {
-  View,
-  Text,
-  StyleSheet,
-  SafeAreaView,
-  TouchableOpacity,
-  Alert,
-  Platform,
-} from "react-native";
-import { useLocalSearchParams, useRouter } from "expo-router";
 import { Ionicons } from "@expo/vector-icons";
-import { COLORS } from "./theme";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
-import { BASE_URL, AI_URL } from "./config";
+import { useLocalSearchParams, useRouter } from "expo-router";
+import React, { useEffect, useState } from "react";
+import {
+  Alert,
+  SafeAreaView,
+  StyleSheet,
+  Text,
+  TouchableOpacity,
+  View,
+} from "react-native";
+import { BASE_URL } from "./config";
+import { COLORS } from "./theme";
 
 export default function JobDetail() {
   const { job } = useLocalSearchParams<{ job: string }>();
@@ -62,7 +61,7 @@ export default function JobDetail() {
       });
 
       const found = res.data.find(
-        (a: any) => Number(a.job_id) === Number(data.job_id)
+        (a: any) => Number(a.job_id) === Number(data.job_id),
       );
       if (found) setAlreadyApplied(true);
       else setAlreadyApplied(false);
@@ -89,7 +88,7 @@ export default function JobDetail() {
       await axios.post(
         `${BASE_URL}/api/applications`,
         { job_id: Number(data.job_id) },
-        { headers: { Authorization: `Bearer ${token}` } }
+        { headers: { Authorization: `Bearer ${token}` } },
       );
 
       Alert.alert("✅ สมัครงานสำเร็จ");
@@ -160,8 +159,8 @@ export default function JobDetail() {
             {isOwner
               ? "เป็นเจ้าของงาน"
               : alreadyApplied
-              ? "สมัครแล้ว"
-              : "Accept Job"}
+                ? "สมัครแล้ว"
+                : "Accept Job"}
           </Text>
         </TouchableOpacity>
 
@@ -169,7 +168,9 @@ export default function JobDetail() {
           onPress={() => router.back()}
           style={{ marginTop: 8 }}
         >
-          <Text style={{ textAlign: "center", color: COLORS.sub }}>Cancel</Text>
+          <Text style={{ textAlign: "center", color: COLORS.sub }}>
+            ย้อนกลับ
+          </Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
