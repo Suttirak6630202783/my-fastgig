@@ -1,14 +1,14 @@
 import dotenv from "dotenv";
 dotenv.config();
 
-import express from "express";
-import cors from "cors";
 import bcrypt from "bcryptjs";
-import jwt from "jsonwebtoken";
-import mysql from "mysql2/promise";
-import multer from "multer";
-import path from "path";
+import cors from "cors";
+import express from "express";
 import fs from "fs";
+import jwt from "jsonwebtoken";
+import multer from "multer";
+import mysql from "mysql2/promise";
+import path from "path";
 import { fileURLToPath } from "url";
 
 const __filename = fileURLToPath(import.meta.url);
@@ -92,7 +92,7 @@ app.post("/api/register", async (req, res) => {
 
     const [exist] = await pool.query(
       "SELECT user_id FROM users WHERE email=?",
-      [email]
+      [email],
     );
     if (exist.length)
       return res.status(409).json({ error: "Email ถูกใช้งานแล้ว" });
@@ -112,7 +112,7 @@ app.post("/api/register", async (req, res) => {
         phone || "",
         Number(age) || null,
         skillsClean,
-      ]
+      ],
     );
 
     res.json({ message: "Register success ✅" });
@@ -168,7 +168,7 @@ app.get("/api/me", auth, async (req, res) => {
           TRIM(fn_GetTrustLevel(IFNULL(u.trust_points, 0))) AS trust_level
        FROM users AS u
        WHERE u.user_id=?`,
-      [req.user.id]
+      [req.user.id],
     );
     if (!rows.length) return res.status(404).json({ error: "User not found" });
     res.json(rows[0]);
@@ -182,7 +182,7 @@ app.put("/api/me", auth, async (req, res) => {
     const { full_name, age, skills, phone } = req.body;
     await pool.query(
       `UPDATE users SET full_name=?, age=?, skills=?, phone=? WHERE user_id=?`,
-      [full_name || "", age || null, skills || "", phone || "", req.user.id]
+      [full_name || "", age || null, skills || "", phone || "", req.user.id],
     );
     res.json({ message: "Profile updated ✅" });
   } catch (e) {
@@ -207,7 +207,7 @@ app.post(
     } catch (e) {
       res.status(500).json({ error: "Upload error", detail: e.message });
     }
-  }
+  },
 );
 
 // ---------------- Jobs ----------------
@@ -230,12 +230,11 @@ app.get("/api/jobs", async (req, res) => {
         j.created_at,
         u.full_name,
         u.profile_image,
-        CAST(fn_AvgPay(j.job_id) AS DECIMAL(10,2)) AS avg_pay
-      FROM jobs AS j
+        CAST((j.pay_min + j.pay_max) / 2 AS DECIMAL(10,2)) AS avg_pay      FROM jobs AS j
       JOIN users AS u ON j.user_id = u.user_id
       ORDER BY j.created_at DESC
       LIMIT 50
-      `
+      `,
     );
 
     res.json(rows);
@@ -281,7 +280,7 @@ app.post("/api/jobs", auth, async (req, res) => {
         location_text || "",
         age_min ? parseInt(age_min) : null,
         age_max ? parseInt(age_max) : null,
-      ]
+      ],
     );
 
     res.json({ message: "Job created ✅" });
@@ -307,7 +306,7 @@ app.post("/api/applications", auth, async (req, res) => {
     // ✅ แก้ไข: ลบ dbo.
     const [jobRows] = await pool.query(
       "SELECT user_id FROM jobs WHERE job_id=?",
-      [job_id]
+      [job_id],
     );
     if (!jobRows.length)
       return res.status(404).json({ error: "Job not found" });
@@ -317,7 +316,7 @@ app.post("/api/applications", auth, async (req, res) => {
 
     const [exist] = await pool.query(
       "SELECT 1 FROM applications WHERE job_id=? AND user_id=?",
-      [job_id, req.user.id]
+      [job_id, req.user.id],
     );
     if (exist.length)
       return res.status(400).json({ error: "คุณสมัครงานนี้แล้ว" });
@@ -326,7 +325,7 @@ app.post("/api/applications", auth, async (req, res) => {
     await pool.query(
       `INSERT INTO applications (job_id, user_id, status_code, applied_at)
        VALUES (?, ?, 'PENDING', NOW())`,
-      [job_id, req.user.id]
+      [job_id, req.user.id],
     );
 
     res.json({ message: "สมัครงานสำเร็จ ✅" });
@@ -341,7 +340,7 @@ app.get("/api/my-applications", auth, async (req, res) => {
     `SELECT a.*, j.title, j.description, j.pay_min, j.pay_max
      FROM applications a JOIN jobs j ON a.job_id=j.job_id
      WHERE a.user_id=?`,
-    [req.user.id]
+    [req.user.id],
   );
   res.json(rows);
 });
@@ -376,7 +375,7 @@ app.get("/api/jobs/:id/applicants", auth, async (req, res) => {
         END,
         a.applied_at ASC
       `,
-      [jobId]
+      [jobId],
     );
 
     res.json(rows);
@@ -390,7 +389,7 @@ app.get("/api/jobs/:id/applicants", auth, async (req, res) => {
 async function assertJobOwnerFromApplicationOr403(req, res, applicationId) {
   const [rows] = await pool.query(
     "SELECT job_id, user_id FROM applications WHERE application_id=?",
-    [applicationId]
+    [applicationId],
   );
   if (!rows.length) {
     res.status(404).json({ error: "Application not found" });
@@ -399,7 +398,7 @@ async function assertJobOwnerFromApplicationOr403(req, res, applicationId) {
   const appData = rows[0];
   const [jobOwner] = await pool.query(
     "SELECT user_id FROM jobs WHERE job_id=?",
-    [appData.job_id]
+    [appData.job_id],
   );
   if (!jobOwner.length) {
     res.status(404).json({ error: "Job not found" });
@@ -418,14 +417,14 @@ app.post("/api/applications/:id/accept", auth, async (req, res) => {
   const appData = await assertJobOwnerFromApplicationOr403(
     req,
     res,
-    applicationId
+    applicationId,
   );
   if (!appData) return;
 
   try {
     await pool.query(
       "UPDATE applications SET status_code='ACCEPTED' WHERE application_id=?",
-      [applicationId]
+      [applicationId],
     );
   } catch (err) {
     if (err.code === "ER_DUP_ENTRY" || err.errno === 1062) {
@@ -445,7 +444,7 @@ app.post("/api/applications/:id/accept", auth, async (req, res) => {
       appData.user_id,
       "APPLICATION_ACCEPTED",
       `คุณได้รับการตอบรับในงาน #${appData.job_id}`,
-    ]
+    ],
   );
 
   res.json({ message: "Applicant accepted ✅" });
@@ -456,13 +455,13 @@ app.post("/api/applications/:id/reject", auth, async (req, res) => {
   const appData = await assertJobOwnerFromApplicationOr403(
     req,
     res,
-    applicationId
+    applicationId,
   );
   if (!appData) return;
 
   await pool.query(
     "UPDATE applications SET status_code='REJECTED' WHERE application_id=?",
-    [applicationId]
+    [applicationId],
   );
   await pool.query(
     "INSERT INTO notifications (user_id, notif_type, content, created_at) VALUES (?, ?, ?, NOW())",
@@ -470,7 +469,7 @@ app.post("/api/applications/:id/reject", auth, async (req, res) => {
       appData.user_id,
       "APPLICATION_REJECTED",
       `คุณถูกปฏิเสธจากงาน #${appData.job_id}`,
-    ]
+    ],
   );
   res.json({ message: "Applicant rejected ❌" });
 });
@@ -486,22 +485,22 @@ app.post("/api/applications/:id/complete", auth, async (req, res) => {
   const appData = await assertJobOwnerFromApplicationOr403(
     req,
     res,
-    applicationId
+    applicationId,
   );
   if (!appData) return;
 
   try {
     await pool.query(
       "UPDATE applications SET status_code = 'DONE' WHERE application_id = ?",
-      [applicationId]
+      [applicationId],
     );
     await pool.query(
       "UPDATE users SET trust_points = IFNULL(trust_points, 0) + ?, completed_jobs = IFNULL(completed_jobs, 0) + 1 WHERE user_id = ?",
-      [points, appData.user_id]
+      [points, appData.user_id],
     );
     await pool.query(
       "INSERT INTO pointsledger (user_id, points, reason, created_at) VALUES (?, ?, ?, NOW())",
-      [appData.user_id, points, `งาน #${appData.job_id} เสร็จสิ้น`]
+      [appData.user_id, points, `งาน #${appData.job_id} เสร็จสิ้น`],
     );
     await pool.query(
       "INSERT INTO notifications (user_id, notif_type, content, created_at) VALUES (?, ?, ?, NOW())",
@@ -509,12 +508,12 @@ app.post("/api/applications/:id/complete", auth, async (req, res) => {
         appData.user_id,
         "TRUST_POINTS",
         `งาน #${appData.job_id} เสร็จสิ้น คุณได้รับ ${points} คะแนน`,
-      ]
+      ],
     );
 
     const [uRows] = await pool.query(
       "SELECT completed_jobs FROM users WHERE user_id=?",
-      [appData.user_id]
+      [appData.user_id],
     );
     res.json({
       message: "✅ Job completed successfully",
@@ -531,7 +530,7 @@ app.post("/api/applications/:id/complete", auth, async (req, res) => {
 app.get("/api/notifications", auth, async (req, res) => {
   const [rows] = await pool.query(
     "SELECT * FROM notifications WHERE user_id=? ORDER BY created_at DESC",
-    [req.user.id]
+    [req.user.id],
   );
   res.json(rows);
 });
@@ -626,5 +625,5 @@ app.delete("/api/jobs/:id", auth, async (req, res) => {
 
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () =>
-  console.log(`🚀 API running on http://localhost:${PORT}`)
+  console.log(`🚀 API running on http://localhost:${PORT}`),
 );

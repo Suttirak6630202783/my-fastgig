@@ -1,133 +1,44 @@
 // app/index.tsx
 import AsyncStorage from "@react-native-async-storage/async-storage";
-import axios from "axios";
 import { useRouter } from "expo-router";
-import React, { useState } from "react";
-import {
-  ActivityIndicator,
-  SafeAreaView,
-  StyleSheet,
-  Text,
-  TextInput,
-  TouchableOpacity,
-  View,
-} from "react-native";
-import { BASE_URL } from "./config";
+import React, { useEffect } from "react";
+import { ActivityIndicator, StyleSheet, View } from "react-native";
 import { COLORS } from "./theme";
 
-export default function LoginScreen() {
+export default function IndexScreen() {
   const router = useRouter();
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
 
-  const handleLogin = async () => {
-    if (!email || !password) return alert("กรอก Email/Password");
-    setLoading(true);
-    try {
-      // ✅ เคลียร์ token เก่าออกก่อน (กัน token ค้างจาก user อื่น)
-      await AsyncStorage.multiRemove(["token", "user_id"]);
+  useEffect(() => {
+    const checkAuth = async () => {
+      // รอสักนิดให้ดูเหมือนโหลด (Optional)
+      await new Promise((resolve) => setTimeout(resolve, 1000));
 
-      const res = await axios.post(`${BASE_URL}/api/login`, {
-        email,
-        password,
-      });
+      const token = await AsyncStorage.getItem("token");
+      if (token) {
+        // ถ้ามี token ให้ไปหน้า Home เลย
+        router.replace("/home");
+      } else {
+        // ถ้าไม่มี token ให้ไปหน้า Login
+        router.replace("/login");
+      }
+    };
 
-      // ✅ เก็บ token และ user_id ใหม่
-      await AsyncStorage.setItem("token", res.data.token);
-      await AsyncStorage.setItem("user_id", String(res.data.user_id));
-
-      console.log("✅ Login success:", res.data.user_id);
-      router.replace("/home");
-    } catch (e: any) {
-      alert(e.response?.data?.error || "เกิดข้อผิดพลาด");
-    } finally {
-      setLoading(false);
-    }
-  };
+    checkAuth();
+  }, []);
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <View style={styles.card}>
-        <Text style={styles.logo}>
-          FAST<Text style={{ color: COLORS.accent }}>GIG</Text>
-        </Text>
-        <Text style={styles.caption}>Welcome to FASTGIG</Text>
-
-        <Text style={styles.label}>Email</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Your Email"
-          autoCapitalize="none"
-          value={email}
-          onChangeText={setEmail}
-        />
-
-        <Text style={styles.label}>Password</Text>
-        <TextInput
-          style={styles.input}
-          placeholder="Enter Your Password"
-          secureTextEntry
-          value={password}
-          onChangeText={setPassword}
-        />
-
-        <TouchableOpacity style={styles.primaryBtn} onPress={handleLogin}>
-          {loading ? (
-            <ActivityIndicator color="#fff" />
-          ) : (
-            <Text style={styles.primaryBtnText}>Continue</Text>
-          )}
-        </TouchableOpacity>
-
-        <TouchableOpacity
-          onPress={() => router.push("/register")}
-          style={{ marginTop: 14 }}
-        >
-          <Text style={styles.link}>
-            Don’t have an account?{" "}
-            <Text style={{ color: COLORS.accent }}>Sign Up</Text>
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+    <View style={styles.container}>
+      {/* ใส่ Logo หรือรูป Loading ตรงนี้ได้ */}
+      <ActivityIndicator size="large" color={COLORS.white} />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: {
+  container: {
     flex: 1,
-    backgroundColor: COLORS.primary,
+    backgroundColor: COLORS.primary, // ใช้สีธีมหลัก
     justifyContent: "center",
-    padding: 20,
+    alignItems: "center",
   },
-  card: {},
-  logo: {
-    fontSize: 32,
-    color: "#fff",
-    textAlign: "center",
-    fontFamily: "Kanit_800ExtraBold",
-  },
-  caption: { textAlign: "center", color: "#EAEAF4", marginBottom: 24 },
-  label: { color: "#fff", marginBottom: 6, fontFamily: "Kanit_600SemiBold" },
-  input: {
-    backgroundColor: "#fff",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-  },
-  primaryBtn: {
-    backgroundColor: "#7B61FF",
-    padding: 14,
-    borderRadius: 10,
-    marginTop: 6,
-  },
-  primaryBtnText: {
-    color: "#fff",
-    textAlign: "center",
-    fontFamily: "Kanit_600SemiBold",
-    fontSize: 16,
-  },
-  link: { color: "#fff", textAlign: "center" },
 });

@@ -1,9 +1,10 @@
 // app/ProfileScreen.tsx
+import BottomMenu from "@/components/BottomMenu";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import * as ImagePicker from "expo-image-picker";
-import { useRouter } from "expo-router"; // ✅ เพิ่ม
-import React, { useEffect, useState } from "react";
+import { useFocusEffect, useRouter } from "expo-router"; // ✅ เพิ่ม useFocusEffect
+import React, { useCallback, useState } from "react"; // ✅ เพิ่ม useCallback
 import {
   ActivityIndicator,
   Alert,
@@ -11,6 +12,7 @@ import {
   Platform,
   SafeAreaView,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -18,8 +20,22 @@ import {
   View,
 } from "react-native";
 import { BASE_URL } from "./config";
+import { COLORS } from "./theme";
 
-// ✅ fallback: คำนวณระดับจากคะแนน (ใช้เมื่อ API ยังไม่ส่ง trust_level)
+// ✅ Helper Function: Popup รองรับ Web/Mobile
+const showConfirm = (title: string, message: string, onConfirm: () => void) => {
+  if (Platform.OS === "web") {
+    if (window.confirm(`${title}\n\n${message}`)) {
+      onConfirm();
+    }
+  } else {
+    Alert.alert(title, message, [
+      { text: "ยกเลิก", style: "cancel" },
+      { text: "ตกลง", onPress: onConfirm },
+    ]);
+  }
+};
+
 function getTrustMeta(points: number) {
   if (points >= 100) return { label: "🌟 Expert", color: "#2E7D32" };
   if (points >= 50) return { label: "✅ Trusted", color: "#1E88E5" };
@@ -28,7 +44,6 @@ function getTrustMeta(points: number) {
   return { label: "⚠️ Negative", color: "#E53935" };
 }
 
-// ✅ map สีจาก label ที่มาจาก DB
 function getColorForLevel(level: string) {
   switch (level) {
     case "🌟 Expert":
@@ -47,7 +62,7 @@ function getColorForLevel(level: string) {
 }
 
 export default function ProfileScreen() {
-  const router = useRouter(); // ✅ เพิ่ม
+  const router = useRouter();
 
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(false);
@@ -60,37 +75,37 @@ export default function ProfileScreen() {
   const [skills, setSkills] = useState("");
   const [trustPoints, setTrustPoints] = useState("0");
   const [phone, setPhone] = useState("");
-
-  // badge states
   const [trustLabel, setTrustLabel] = useState("🆕 Newbie");
   const [trustColor, setTrustColor] = useState("#6B4EFF");
-
-  // completed jobs
   const [completedJobs, setCompletedJobs] = useState(0);
 
-  // โหลดข้อมูลโปรไฟล์
   const fetchProfile = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
-      if (!token) return;
+      if (!token) {
+        // ถ้าไม่มี token ให้เคลียร์ข้อมูล (กันแสดงของคนเก่า)
+        setProfile(null);
+        return;
+      }
 
       const res = await axios.get(`${BASE_URL}/api/me`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
-      setProfile(res.data);
+      const data = res.data;
+      setProfile(data);
 
-      setUsername(res.data.full_name || "");
-      setAge(res.data.age?.toString() || "");
-      setEmail(res.data.email || "");
-      setSkills(res.data.skills || "");
-      const tp = Number(res.data.trust_points ?? 0);
+      setUsername(data.full_name || "");
+      setAge(data.age?.toString() || "");
+      setEmail(data.email || "");
+      setSkills(data.skills || "");
+      const tp = Number(data.trust_points ?? 0);
       setTrustPoints(tp.toString());
-      setPhone(res.data.phone || "");
+      setPhone(data.phone || "");
+      setCompletedJobs(Number(data.completed_jobs ?? 0));
 
-      // ✅ ใช้ trust_level จาก DB ถ้ามี; ถ้าไม่มีใช้ fallback
-      if (res.data.trust_level) {
-        const levelFromDB = String(res.data.trust_level);
+      if (data.trust_level) {
+        const levelFromDB = String(data.trust_level);
         setTrustLabel(levelFromDB);
         setTrustColor(getColorForLevel(levelFromDB));
       } else {
@@ -98,30 +113,57 @@ export default function ProfileScreen() {
         setTrustLabel(meta.label);
         setTrustColor(meta.color);
       }
-
-      setCompletedJobs(Number(res.data.completed_jobs ?? 0));
     } catch (e: any) {
       console.log("Profile load error:", e.message);
+      // ถ้า Error 401/403 (Token หมดอายุ) ให้เด้งออก
+      if (
+        e.response &&
+        (e.response.status === 401 || e.response.status === 403)
+      ) {
+        await AsyncStorage.multiRemove(["token", "user_id"]);
+        router.replace("/");
+      }
     }
   };
 
-  useEffect(() => {
-    fetchProfile();
-  }, []);
+  // ✅ ใช้ useFocusEffect แทน useEffect
+  // โค้ดนี้จะทำงาน "ทุกครั้ง" ที่หน้าจอนี้ถูกเปิดดู (Focus)
+  useFocusEffect(
+    useCallback(() => {
+      fetchProfile();
+    }, []),
+  );
 
-  // อัปโหลดรูป (Mobile)
+  const executeUpload = async (formData: FormData, token: string) => {
+    try {
+      setLoading(true);
+      const res = await axios.post(`${BASE_URL}/api/upload-profile`, formData, {
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "multipart/form-data",
+        },
+      });
+      setProfile((p: any) => ({ ...p, profile_image: res.data.profile_image }));
+
+      if (Platform.OS === "web") {
+        alert("เปลี่ยนรูปโปรไฟล์เรียบร้อยแล้วครับ ✅");
+      } else {
+        Alert.alert("สำเร็จ", "เปลี่ยนรูปโปรไฟล์เรียบร้อยแล้วครับ ✅");
+      }
+    } catch (err: any) {
+      console.error("Upload Error:", err);
+      alert(err.response?.data?.error || err.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
   const uploadProfileMobile = async () => {
     const token = await AsyncStorage.getItem("token");
-    if (!token) {
-      Alert.alert("กรุณาเข้าสู่ระบบ");
-      return;
-    }
+    if (!token) return alert("กรุณาเข้าสู่ระบบ");
 
     const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!permission.granted) {
-      Alert.alert("ต้องอนุญาตเข้าถึงรูปภาพก่อน");
-      return;
-    }
+    if (!permission.granted) return alert("ต้องอนุญาตเข้าถึงรูปภาพก่อน");
 
     let result = await ImagePicker.launchImageLibraryAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
@@ -132,290 +174,331 @@ export default function ProfileScreen() {
 
     if (result.canceled) return;
 
-    let localUri = result.assets[0].uri;
-    let filename = localUri.split("/").pop()!;
-    let formData = new FormData();
+    showConfirm(
+      "ยืนยันรูปโปรไฟล์",
+      "คุณต้องการใช้รูปนี้ใช่หรือไม่?",
+      async () => {
+        try {
+          const asset = result.assets[0];
+          let localUri = asset.uri;
+          let filename = localUri.split("/").pop() || "profile.jpg";
+          let match = /\.(\w+)$/.exec(filename);
+          let type = match ? `image/${match[1]}` : `image/jpeg`;
 
-    formData.append("profile", {
-      uri: localUri,
-      name: filename,
-      type: "image/jpeg",
-    } as any);
+          let formData = new FormData();
 
-    try {
-      setLoading(true);
-      const res = await axios.post(`${BASE_URL}/api/upload-profile`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      setProfile((p: any) => ({ ...p, profile_image: res.data.profile_image }));
-      await fetchProfile();
-    } catch (err: any) {
-      Alert.alert("❌ Upload error", err.response?.data?.error || err.message);
-    } finally {
-      setLoading(false);
-    }
+          if (Platform.OS === "web") {
+            const response = await fetch(localUri);
+            const blob = await response.blob();
+            formData.append("profile", blob, filename);
+          } else {
+            // @ts-ignore
+            formData.append("profile", {
+              uri: localUri,
+              name: filename,
+              type: type,
+            });
+          }
+
+          await executeUpload(formData, token);
+        } catch (e) {
+          console.error("Image Prep Error:", e);
+          alert("เกิดข้อผิดพลาดในการเตรียมไฟล์รูป");
+        }
+      },
+    );
   };
 
-  // อัปโหลดรูป (Web)
-  const uploadProfileWeb = async (file: File) => {
-    const token = await AsyncStorage.getItem("token");
-    if (!token) return;
-
-    let formData = new FormData();
-    formData.append("profile", file);
-
-    try {
-      setLoading(true);
-      const res = await axios.post(`${BASE_URL}/api/upload-profile`, formData, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-          "Content-Type": "multipart/form-data",
-        },
-      });
-      setProfile((p: any) => ({ ...p, profile_image: res.data.profile_image }));
-      await fetchProfile();
-    } catch (err: any) {
-      alert("❌ Upload error: " + (err.response?.data?.error || err.message));
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // บันทึกโปรไฟล์
   const saveProfile = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
       if (!token) return;
-
       await axios.put(
         `${BASE_URL}/api/me`,
         { full_name: username, age, skills, phone },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      Alert.alert("✅ บันทึกแล้ว");
+      if (Platform.OS === "web") {
+        alert("✅ บันทึกข้อมูลเรียบร้อยแล้ว");
+      } else {
+        Alert.alert("✅ สำเร็จ", "บันทึกข้อมูลเรียบร้อยแล้ว");
+      }
+
       setEditMode(false);
-      await fetchProfile();
+      fetchProfile(); // โหลดใหม่หลังบันทึก
     } catch (err: any) {
-      Alert.alert("❌ Update error", err.response?.data?.error || err.message);
+      alert(err.response?.data?.error || err.message);
     }
   };
 
-  if (!profile) {
+  const handleLogout = async () => {
+    showConfirm("ออกจากระบบ", "คุณต้องการออกจากระบบใช่หรือไม่?", async () => {
+      await AsyncStorage.removeItem("token");
+      await AsyncStorage.removeItem("user_id");
+      router.replace("/login");
+    });
+  };
+
+  const handleMainButton = () => {
+    if (editMode) {
+      showConfirm(
+        "ยืนยันการบันทึก",
+        "คุณต้องการบันทึกการเปลี่ยนแปลงใช่หรือไม่?",
+        saveProfile,
+      );
+    } else {
+      setEditMode(true);
+    }
+  };
+
+  if (!profile && !loading) {
     return (
-      <SafeAreaView style={styles.safe}>
-        <ActivityIndicator size="large" color="#5D3FD3" />
+      <SafeAreaView style={styles.loadingContainer}>
+        <ActivityIndicator size="large" color={COLORS.primary} />
       </SafeAreaView>
     );
   }
 
-  const profileImageUri = profile.profile_image
+  const profileImageUri = profile?.profile_image
     ? `${BASE_URL}${profile.profile_image}`
     : "https://cdn-icons-png.flaticon.com/512/149/149071.png";
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView>
-        {/* Header */}
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         <View style={styles.header}>
-          <Image source={{ uri: profileImageUri }} style={styles.avatar} />
+          <TouchableOpacity style={styles.logoutBtn} onPress={handleLogout}>
+            <Text style={styles.logoutText}>Logout</Text>
+          </TouchableOpacity>
 
-          {/* ปุ่มเปลี่ยนรูป */}
-          {Platform.OS === "web" ? (
-            <View style={{ alignItems: "center" }}>
-              <input
-                id="uploadWeb"
-                type="file"
-                accept="image/*"
-                onChange={(e) => {
-                  const file =
-                    (e.target as HTMLInputElement).files?.[0] ||
-                    (e.target as any).files?.[0];
-                  if (file) uploadProfileWeb(file);
-                }}
-                style={{ display: "none" }}
-              />
-              <TouchableOpacity
-                style={styles.editPhotoBtn}
-                onPress={() =>
-                  (document.getElementById("uploadWeb") as any)?.click()
-                }
-              >
-                <Text style={{ color: "#fff", fontSize: 12 }}>เปลี่ยนรูป</Text>
-              </TouchableOpacity>
-            </View>
-          ) : (
-            <TouchableOpacity
-              style={styles.editPhotoBtn}
-              onPress={uploadProfileMobile}
-            >
-              <Text style={{ color: "#fff", fontSize: 12 }}>เปลี่ยนรูป</Text>
-            </TouchableOpacity>
-          )}
-
-          <Text style={styles.username}>{username}</Text>
-
-          {/* ✅ Trust Badge */}
-          <View
-            style={[
-              styles.badge,
-              {
-                backgroundColor: trustColor,
-                borderColor: trustColor,
-                borderWidth: 2,
-              },
-            ]}
-          >
-            <Text style={styles.badgeText}>{trustLabel}</Text>
-            <Text style={styles.badgePoints}> • {trustPoints} pts</Text>
+          <View style={styles.avatarContainer}>
+            <Image source={{ uri: profileImageUri }} style={styles.avatar} />
           </View>
 
-          {/* ✅ จำนวนงานสำเร็จ */}
-          <Text style={styles.completedText}>
-            งานที่ทำสำเร็จแล้ว: {completedJobs} งาน
+          <TouchableOpacity
+            style={styles.changePhotoBtn}
+            onPress={uploadProfileMobile}
+          >
+            <Text style={styles.changePhotoText}>เปลี่ยนรูป</Text>
+          </TouchableOpacity>
+
+          <Text style={styles.headerName}>{username || "No Name"}</Text>
+          <View style={[styles.statusBadge, { backgroundColor: "#483085" }]}>
+            <Text style={styles.statusText}>
+              {trustLabel} : {trustPoints} pts
+            </Text>
+          </View>
+          <Text style={styles.jobCountText}>
+            งานที่สำเร็จแล้ว : {completedJobs} งาน
           </Text>
 
-          {/* ✅ ปุ่มใหม่: ไปหน้า “สรุปผลงานผู้ใช้” */}
           <TouchableOpacity
-            style={styles.navBtn}
+            style={styles.myWorksBtn}
             onPress={() => router.push("/performance")}
           >
-            <Text style={styles.navBtnText}>📊 ดูผลงานฉัน</Text>
+            <Text style={styles.myWorksText}>ผลงานของฉัน</Text>
           </TouchableOpacity>
         </View>
 
-        {/* Form */}
-        <View style={styles.form}>
-          <Text style={styles.label}>Username</Text>
+        <View style={styles.formContainer}>
+          <Text style={styles.label}>Username :</Text>
           <TextInput
-            style={[styles.input, styles.readonly]}
+            style={[
+              styles.input,
+              editMode ? styles.editingInput : styles.readonlyInput,
+            ]}
             value={username}
-            editable={false}
+            onChangeText={setUsername}
+            editable={editMode}
           />
 
-          <Text style={styles.label}>Email</Text>
+          <Text style={styles.label}>Email :</Text>
           <TextInput
-            style={[styles.input, styles.readonly]}
+            style={[styles.input, styles.readonlyInput]}
             value={email}
             editable={false}
           />
 
-          <Text style={styles.label}>Phone</Text>
+          <Text style={styles.label}>Skill :</Text>
           <TextInput
-            style={[styles.input, !editMode && styles.readonly]}
-            value={phone}
-            onChangeText={setPhone}
+            style={[
+              styles.input,
+              editMode ? styles.editingInput : styles.readonlyInput,
+            ]}
+            value={skills}
+            onChangeText={setSkills}
             editable={editMode}
-            keyboardType="phone-pad"
+            placeholder="ระบุทักษะ"
           />
 
-          <Text style={styles.label}>Age</Text>
+          <Text style={styles.label}>Trust Points :</Text>
           <TextInput
-            style={[styles.input, !editMode && styles.readonly]}
+            style={[styles.input, styles.readonlyInput]}
+            value={trustPoints}
+            editable={false}
+          />
+
+          <Text style={styles.label}>Age :</Text>
+          <TextInput
+            style={[
+              styles.input,
+              editMode ? styles.editingInput : styles.readonlyInput,
+            ]}
             value={age}
             onChangeText={setAge}
             editable={editMode}
             keyboardType="numeric"
           />
 
-          <Text style={styles.label}>Skill</Text>
+          <Text style={styles.label}>Phone :</Text>
           <TextInput
-            style={[styles.input, !editMode && styles.readonly]}
-            value={skills}
-            onChangeText={setSkills}
+            style={[
+              styles.input,
+              editMode ? styles.editingInput : styles.readonlyInput,
+            ]}
+            value={phone}
+            onChangeText={setPhone}
             editable={editMode}
+            keyboardType="phone-pad"
           />
 
-          <Text style={styles.label}>Trust Points</Text>
-          <TextInput
-            style={[styles.input, styles.readonly]}
-            value={trustPoints}
-            editable={false}
-          />
+          <TouchableOpacity
+            style={[
+              styles.actionBtn,
+              editMode ? { backgroundColor: "#4CAF50" } : {},
+            ]}
+            onPress={handleMainButton}
+          >
+            <Text style={styles.actionBtnText}>
+              {editMode ? "💾 ยืนยันการบันทึก" : "✏️ แก้ไขโปรไฟล์"}
+            </Text>
+          </TouchableOpacity>
         </View>
-
-        {/* ปุ่มแก้ไข/บันทึก */}
-        <TouchableOpacity
-          style={styles.btn}
-          onPress={() => {
-            if (editMode) saveProfile();
-            else setEditMode(true);
-          }}
-        >
-          <Text style={styles.btnText}>
-            {editMode ? "บันทึกโปรไฟล์" : "แก้ไขโปรไฟล์"}
-          </Text>
-        </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+
+      <BottomMenu />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: "#fff" },
+  container: { flex: 1, backgroundColor: "#FAFAFA" },
+  loadingContainer: { flex: 1, justifyContent: "center", alignItems: "center" },
+  scrollContent: { paddingBottom: 100 },
   header: {
-    backgroundColor: "#6B4EFF",
-    borderBottomLeftRadius: 24,
-    borderBottomRightRadius: 24,
+    backgroundColor: COLORS.primary,
+    paddingTop: 50,
+    paddingBottom: 30,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
     alignItems: "center",
-    paddingVertical: 30,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    elevation: 8,
+    zIndex: 1,
   },
-  avatar: { width: 100, height: 100, borderRadius: 50, marginBottom: 8 },
-  editPhotoBtn: {
-    backgroundColor: "#5D3FD3",
-    paddingHorizontal: 16,
-    paddingVertical: 6,
-    borderRadius: 16,
-    marginTop: 6,
-  },
-  username: { fontSize: 22, fontWeight: "700", color: "#fff", marginTop: 6 },
-
-  // ✅ Trust badge
-  badge: {
-    flexDirection: "row",
-    alignItems: "center",
+  logoutBtn: {
+    position: "absolute",
+    top: 50,
+    right: 20,
+    backgroundColor: "#E53935",
     paddingHorizontal: 12,
     paddingVertical: 6,
-    borderRadius: 20,
-    marginTop: 8,
-  },
-  badgeText: { color: "#fff", fontWeight: "700" },
-  badgePoints: { color: "#fff", opacity: 0.9, fontWeight: "600" },
-
-  completedText: { color: "#fff", marginTop: 6, fontWeight: "600" },
-
-  // ✅ ปุ่มไปหน้า Performance
-  navBtn: {
-    marginTop: 10,
-    backgroundColor: "#FFE082",
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 10,
-  },
-  navBtnText: { fontWeight: "800", color: "#5D3FD3" },
-
-  form: { padding: 20 },
-  label: { fontSize: 14, color: "#555", marginTop: 12, marginBottom: 4 },
-  input: {
-    borderWidth: 1,
-    borderColor: "#ccc",
     borderRadius: 8,
-    padding: 10,
-    fontSize: 14,
-    backgroundColor: "#f9f9f9",
+    zIndex: 10,
+    elevation: 5,
+  },
+  logoutText: { color: "#fff", fontSize: 12, fontWeight: "bold" },
+  avatarContainer: {
+    marginBottom: 8,
+    backgroundColor: "#fff",
+    borderRadius: 60,
+    padding: 3,
+  },
+  avatar: { width: 110, height: 110, borderRadius: 55 },
+  changePhotoBtn: {
+    backgroundColor: "#9575CD",
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 12,
     marginBottom: 10,
   },
-  readonly: { backgroundColor: "#eee", color: "#777" },
-  btn: {
-    marginHorizontal: 20,
-    marginTop: 20,
-    backgroundColor: "#5D3FD3",
-    padding: 14,
-    borderRadius: 10,
-    alignItems: "center",
+  changePhotoText: {
+    color: "#fff",
+    fontSize: 12,
+    fontFamily: "Kanit_500Medium",
   },
-  btnText: { color: "#fff", fontSize: 16, fontWeight: "600" },
+  headerName: {
+    fontSize: 24,
+    color: "#fff",
+    fontFamily: "Kanit_700Bold",
+    marginBottom: 4,
+  },
+  statusBadge: {
+    paddingHorizontal: 16,
+    paddingVertical: 4,
+    borderRadius: 12,
+    marginBottom: 6,
+  },
+  statusText: { color: "#fff", fontSize: 13, fontFamily: "Kanit_500Medium" },
+  jobCountText: {
+    color: "#E0E0E0",
+    fontSize: 13,
+    fontFamily: "Kanit_400Regular",
+    marginBottom: 16,
+  },
+  myWorksBtn: {
+    backgroundColor: "#FFE082",
+    paddingHorizontal: 24,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  myWorksText: { color: "#5D4037", fontSize: 14, fontFamily: "Kanit_700Bold" },
+  formContainer: { padding: 24 },
+  label: {
+    fontSize: 16,
+    color: COLORS.primary,
+    fontFamily: "Kanit_700Bold",
+    marginBottom: 6,
+    marginTop: 6,
+  },
+  input: {
+    borderRadius: 10,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    fontSize: 14,
+    fontFamily: "Kanit_400Regular",
+    marginBottom: 10,
+  },
+  readonlyInput: {
+    backgroundColor: "#EFEFEF",
+    color: "#555",
+    borderWidth: 0,
+  },
+  editingInput: {
+    backgroundColor: "#FFFFFF",
+    color: "#000",
+    borderWidth: 1.5,
+    borderColor: COLORS.primary,
+  },
+  actionBtn: {
+    backgroundColor: "#8E72D0",
+    borderRadius: 15,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 24,
+    shadowColor: "#8E72D0",
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+  },
+  actionBtnText: {
+    color: "#fff",
+    fontSize: 18,
+    fontFamily: "Kanit_700Bold",
+  },
 });

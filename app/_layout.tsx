@@ -1,17 +1,23 @@
 // app/_layout.tsx
 import {
+  Kanit_300Light,
   Kanit_400Regular,
   Kanit_500Medium,
   Kanit_600SemiBold,
   Kanit_700Bold,
   Kanit_800ExtraBold,
-  useFonts,
 } from "@expo-google-fonts/kanit";
+import { useFonts } from "expo-font";
 import { Stack } from "expo-router";
-import { Text } from "react-native";
+import * as SplashScreen from "expo-splash-screen";
+import { useEffect } from "react";
+
+// ป้องกันหน้า Splash Screen หายไปก่อนโหลดฟอนต์เสร็จ
+SplashScreen.preventAutoHideAsync();
 
 export default function RootLayout() {
-  const [fontsLoaded] = useFonts({
+  const [loaded, error] = useFonts({
+    Kanit_300Light,
     Kanit_400Regular,
     Kanit_500Medium,
     Kanit_600SemiBold,
@@ -19,12 +25,20 @@ export default function RootLayout() {
     Kanit_800ExtraBold,
   });
 
-  if (!fontsLoaded) return null;
+  useEffect(() => {
+    if (loaded || error) {
+      SplashScreen.hideAsync();
+    }
+  }, [loaded, error]);
 
-  // ✅ ใช้ type assertion เพื่อแก้ error TS2339
-  const TextAny = Text as any;
-  if (TextAny.defaultProps == null) TextAny.defaultProps = {};
-  TextAny.defaultProps.style = { fontFamily: "Kanit_400Regular" };
+  if (!loaded && !error) {
+    return null;
+  }
 
-  return <Stack screenOptions={{ headerShown: false }} />;
+  return (
+    <Stack screenOptions={{ headerShown: false }}>
+      <Stack.Screen name="index" />
+      <Stack.Screen name="(tabs)" />
+    </Stack>
+  );
 }

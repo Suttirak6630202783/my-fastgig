@@ -1,12 +1,15 @@
 // app/job-detail.tsx
-import { Ionicons } from "@expo/vector-icons";
+import BottomMenu from "@/components/BottomMenu"; // ✅ ดึงเมนูล่างมาใส่
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
+  ActivityIndicator,
   Alert,
-  SafeAreaView,
+  Image,
+  ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TouchableOpacity,
@@ -15,226 +18,314 @@ import {
 import { BASE_URL } from "./config";
 import { COLORS } from "./theme";
 
-export default function JobDetail() {
-  const { job } = useLocalSearchParams<{ job: string }>();
+export default function JobDetailScreen() {
   const router = useRouter();
-  const data = job ? JSON.parse(job) : {};
+  const params = useLocalSearchParams();
+  const job = params.job ? JSON.parse(params.job as string) : null;
 
-  const [alreadyApplied, setAlreadyApplied] = useState(false);
+  const [loading, setLoading] = useState(false);
   const [isOwner, setIsOwner] = useState(false);
+  const [hasApplied, setHasApplied] = useState(false);
 
-  // ✅ ฟังก์ชันคำนวณราคาเฉลี่ย (แตะเท่าที่จำเป็น)
-  const calcAvg = (min: any, max: any) => {
-    const pmin = min != null ? Number(min) : null;
-    const pmax = max != null ? Number(max) : null;
-    if (pmin == null && pmax == null) return null;
-    if (pmin == null) return pmax;
-    if (pmax == null) return pmin;
-    return (pmin + pmax) / 2;
-  };
-  const avg = calcAvg(data?.pay_min, data?.pay_max);
-
-  // ✅ รอจน job_id มีค่าแล้วค่อยเช็ค
   useEffect(() => {
-    const init = async () => {
-      if (!data?.job_id) return;
+    checkStatus();
+  }, []);
 
-      const uid = await AsyncStorage.getItem("user_id");
-      if (uid && data?.user_id && Number(uid) === Number(data.user_id)) {
-        setIsOwner(true);
-      }
-
-      await checkApplied();
-    };
-    init();
-  }, [data.job_id]);
-
-  const checkApplied = async () => {
+  const checkStatus = async () => {
     try {
-      const token = await AsyncStorage.getItem("token");
-      const uid = await AsyncStorage.getItem("user_id");
-      if (!token || !uid) return;
-      if (!data?.job_id) return;
-
-      const res = await axios.get(`${BASE_URL}/api/my-applications`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
-
-      const found = res.data.find(
-        (a: any) => Number(a.job_id) === Number(data.job_id),
-      );
-      if (found) setAlreadyApplied(true);
-      else setAlreadyApplied(false);
-    } catch (e: any) {
-      console.log("checkApplied error:", e.message);
+      const userId = await AsyncStorage.getItem("user_id");
+      if (userId && job) {
+        if (String(userId) === String(job.user_id)) setIsOwner(true);
+      }
+    } catch (e) {
+      console.log(e);
     }
   };
 
-  // ✅ สมัครงาน
-  const handleAcceptJob = async () => {
-    if (isOwner) {
-      Alert.alert("ไม่สามารถสมัครงานของตัวเองได้");
-      return;
-    }
-    if (alreadyApplied) return;
-
+  const handleApply = async () => {
     try {
+      setLoading(true);
       const token = await AsyncStorage.getItem("token");
       if (!token) {
-        Alert.alert("กรุณาเข้าสู่ระบบก่อน");
+        Alert.alert("แจ้งเตือน", "กรุณาเข้าสู่ระบบก่อนรับงาน", [
+          { text: "Login", onPress: () => router.push("/") }, // แก้ path เป็น /login ถ้าแยกหน้า
+          { text: "Cancel" },
+        ]);
         return;
       }
 
       await axios.post(
         `${BASE_URL}/api/applications`,
-        { job_id: Number(data.job_id) },
+        { job_id: job.job_id },
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      Alert.alert("✅ สมัครงานสำเร็จ");
-      setAlreadyApplied(true);
+      Alert.alert("สำเร็จ", "รับงานเรียบร้อยแล้ว!");
+      setHasApplied(true);
     } catch (e: any) {
       const msg = e.response?.data?.error || "เกิดข้อผิดพลาด";
-      if (msg.includes("คุณสมัครงานนี้แล้ว")) {
-        setAlreadyApplied(true);
-        Alert.alert("⚠️ สมัครงานไม่สำเร็จ", "คุณสมัครงานนี้ไปแล้ว");
-      } else if (msg.includes("ห้ามสมัครงานของตัวเอง")) {
+      if (msg.includes("สมัครงานนี้แล้ว")) {
+        setHasApplied(true);
+        Alert.alert("แจ้งเตือน", "คุณได้รับงานนี้ไปแล้วครับ");
+      } else if (msg.includes("งานของตัวเอง")) {
         setIsOwner(true);
-        Alert.alert("ไม่สามารถสมัครงานของตัวเองได้");
+        Alert.alert("แจ้งเตือน", "ไม่สามารถรับงานตัวเองได้ครับ");
       } else {
-        Alert.alert("❌ สมัครงานไม่สำเร็จ", msg);
+        Alert.alert("Error", msg);
       }
+    } finally {
+      setLoading(false);
     }
   };
 
-  const acceptDisabled = alreadyApplied || isOwner;
+  if (!job) return null;
+
+  // รูปโปรไฟล์คนจ้าง
+  const profileUri = job.profile_image
+    ? `${BASE_URL}${job.profile_image}`
+    : "https://cdn-icons-png.flaticon.com/512/149/149071.png";
+
+  // คำนวณค่าเฉลี่ย (ถ้าไม่มีมาใน API)
+  const avgPay = job.avg_pay
+    ? Math.round(Number(job.avg_pay))
+    : Math.round((Number(job.pay_min) + Number(job.pay_max)) / 2);
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: COLORS.bg }}>
-      {/* Header */}
-      <View style={styles.header}>
-        <View style={styles.avatarBig}>
-          <Ionicons name="person-outline" size={64} color="#C9C9E4" />
-        </View>
-        <Text style={styles.title}>{data.title}</Text>
-        <View style={styles.chipsRow}>
-          <View style={styles.chip}>
-            <Ionicons name="location-outline" size={16} color="#fff" />
-            <Text style={styles.chipText}>
-              {data.location_text || "ไม่ระบุสถานที่"}
-            </Text>
-          </View>
-          <View style={styles.chip}>
-            <Ionicons name="card-outline" size={16} color="#fff" />
-            <Text style={styles.chipText}>
-              {data.pay_min} - {data.pay_max} บาท
-            </Text>
-          </View>
-          {/* ✅ ชิป “ราคาค่าเฉลี่ย” พร้อมอิโมจิถุงเงิน */}
-          <View style={styles.chip}>
-            <Text style={styles.chipText}>
-              💰 ราคาค่าเฉลี่ย:{" "}
-              {avg != null ? `${Number(avg).toFixed(2)} บาท` : "-"}
-            </Text>
-          </View>
-        </View>
-      </View>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
-      {/* Description */}
-      <View style={{ paddingHorizontal: 16, marginTop: 12 }}>
-        <Text style={styles.sectionTitle}>Description</Text>
-        <View style={styles.descBox}>
-          <Text style={styles.descText}>{data.description}</Text>
-        </View>
-      </View>
+      <ScrollView contentContainerStyle={{ paddingBottom: 100 }}>
+        {/* --- ส่วน Header สีม่วงโค้ง --- */}
+        <View style={styles.headerContainer}>
+          <Text style={styles.pageTitle}>รายละเอียดงาน</Text>
 
-      {/* Buttons */}
-      <View style={{ padding: 16, marginTop: 8 }}>
-        <TouchableOpacity
-          style={[styles.primaryBtn, acceptDisabled && styles.disabledBtn]}
-          onPress={handleAcceptJob}
-          disabled={acceptDisabled}
-        >
-          <Text style={styles.primaryBtnText}>
-            {isOwner
-              ? "เป็นเจ้าของงาน"
-              : alreadyApplied
-                ? "สมัครแล้ว"
-                : "Accept Job"}
+          {/* รูปโปรไฟล์ตรงกลาง */}
+          <View style={styles.profileWrapper}>
+            <Image source={{ uri: profileUri }} style={styles.avatar} />
+          </View>
+
+          <Text style={styles.usernameText}>
+            Username : {job.full_name || "ไม่ระบุชื่อ"}
           </Text>
-        </TouchableOpacity>
 
-        <TouchableOpacity
-          onPress={() => router.back()}
-          style={{ marginTop: 8 }}
-        >
-          <Text style={{ textAlign: "center", color: COLORS.sub }}>
-            ย้อนกลับ
-          </Text>
-        </TouchableOpacity>
-      </View>
-    </SafeAreaView>
+          {/* ชื่องานตัวใหญ่ */}
+          <Text style={styles.jobTitle}>{job.title}</Text>
+
+          {/* Badge 3 อันเรียงกัน */}
+          <View style={styles.badgesRow}>
+            {/* สถานที่ */}
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {job.location_text || "ไม่ระบุ"}
+              </Text>
+            </View>
+            {/* ช่วงราคา */}
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>
+                {job.pay_min} - {job.pay_max} บาท
+              </Text>
+            </View>
+            {/* ราคาเฉลี่ย */}
+            <View style={styles.badge}>
+              <Text style={styles.badgeText}>เฉลี่ย : {avgPay} บาท</Text>
+            </View>
+          </View>
+        </View>
+
+        {/* --- ส่วนเนื้อหา (Description) --- */}
+        <View style={styles.contentContainer}>
+          <Text style={styles.descHeader}>Description</Text>
+          <View style={styles.descLine} />
+
+          {/* กล่องข้อความ Description */}
+          <View style={styles.descBox}>
+            <Text style={styles.descText}>{job.description}</Text>
+          </View>
+
+          {/* ปุ่ม Action */}
+          <View style={styles.actionArea}>
+            {isOwner ? (
+              <TouchableOpacity
+                style={[styles.mainBtn, { backgroundColor: COLORS.accent }]}
+              >
+                <Text style={styles.mainBtnText}>แก้ไขงานของคุณ</Text>
+              </TouchableOpacity>
+            ) : hasApplied ? (
+              <TouchableOpacity
+                style={[styles.mainBtn, { backgroundColor: "#BDBDBD" }]}
+                disabled
+              >
+                <Text style={styles.mainBtnText}>ส่งใบสมัครแล้ว</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity
+                style={styles.mainBtn}
+                onPress={handleApply}
+                disabled={loading}
+              >
+                {loading ? (
+                  <ActivityIndicator color={COLORS.white} />
+                ) : (
+                  <Text style={styles.mainBtnText}>รับงาน</Text>
+                )}
+              </TouchableOpacity>
+            )}
+
+            {/* ปุ่มย้อนกลับ */}
+            <TouchableOpacity
+              style={styles.backLink}
+              onPress={() => router.back()}
+            >
+              <Text style={styles.backLinkText}>ย้อนกลับ</Text>
+              <View style={styles.underline} />
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+
+      {/* Menu Bar ล่างสุด */}
+      <BottomMenu />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  header: {
-    backgroundColor: COLORS.primary,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
-    alignItems: "center",
-    paddingVertical: 24,
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background, // พื้นหลังสีขาวอมเทานิดๆ
   },
-  avatarBig: {
-    backgroundColor: "#F0F0FA",
-    width: 80,
-    height: 80,
-    borderRadius: 40,
-    justifyContent: "center",
+  // --- Header Styles ---
+  headerContainer: {
+    backgroundColor: COLORS.primary, // สีม่วง
+    paddingTop: 50,
+    paddingBottom: 40,
+    borderBottomLeftRadius: 40, // ความโค้งมนด้านล่าง
+    borderBottomRightRadius: 40,
     alignItems: "center",
-    marginBottom: 12,
+    paddingHorizontal: 20,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 5,
+    elevation: 8,
   },
-  title: {
-    color: "#fff",
+  pageTitle: {
     fontSize: 20,
+    color: COLORS.white,
     fontFamily: "Kanit_700Bold",
+    marginBottom: 20,
+  },
+  profileWrapper: {
+    marginBottom: 10,
+  },
+  avatar: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
+    borderWidth: 3,
+    borderColor: COLORS.white,
+  },
+  usernameText: {
+    color: "#E0E0E0",
+    fontSize: 14,
+    fontFamily: "Kanit_400Regular",
     marginBottom: 8,
   },
-  chipsRow: {
+  jobTitle: {
+    fontSize: 22,
+    color: COLORS.white,
+    fontFamily: "Kanit_700Bold",
+    textAlign: "center",
+    marginBottom: 20,
+  },
+  badgesRow: {
     flexDirection: "row",
     flexWrap: "wrap",
-    marginTop: 6,
     justifyContent: "center",
+    gap: 8,
   },
-  chip: {
-    flexDirection: "row",
-    backgroundColor: COLORS.primaryDark,
-    borderRadius: 16,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    marginHorizontal: 4,
-    marginVertical: 4, // ให้ขึ้นบรรทัดใหม่ได้ถ้าช่องแคบ
+  badge: {
+    backgroundColor: COLORS.primaryBtn, // สีม่วงอ่อนกว่าพื้นหลังนิดหน่อย (ตามรูป)
+    paddingVertical: 6,
+    paddingHorizontal: 14,
+    borderRadius: 20,
+  },
+  badgeText: {
+    color: COLORS.white,
+    fontSize: 12,
+    fontFamily: "Kanit_500Medium",
+  },
+
+  // --- Content Styles ---
+  contentContainer: {
+    padding: 24,
+  },
+  descHeader: {
+    fontSize: 20,
+    color: COLORS.primary, // สีม่วงเข้ม
+    fontFamily: "Kanit_700Bold",
+    marginBottom: 4,
+  },
+  descLine: {
+    height: 2,
+    backgroundColor: COLORS.line, // เส้นขีดจางๆ ใต้หัวข้อ
+    width: 120,
+    marginBottom: 20,
+  },
+  descBox: {
+    backgroundColor: COLORS.white,
+    borderRadius: 20,
+    padding: 20,
+    minHeight: 120, // ความสูงขั้นต่ำของกล่อง
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 5,
+    elevation: 3, // เงาให้ดูลอย
+    marginBottom: 30,
+  },
+  descText: {
+    fontSize: 16,
+    color: COLORS.sub,
+    fontFamily: "Kanit_400Regular",
+    lineHeight: 24,
+  },
+
+  // --- Buttons ---
+  actionArea: {
     alignItems: "center",
   },
-  chipText: { color: "#fff", fontSize: 12 },
-  sectionTitle: {
-    fontSize: 14,
-    color: COLORS.text,
-    marginBottom: 4,
+  mainBtn: {
+    backgroundColor: COLORS.primary, // ปุ่มสีม่วง
+    width: "80%",
+    paddingVertical: 14,
+    borderRadius: 15,
+    alignItems: "center",
+    marginBottom: 16,
+    shadowColor: COLORS.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 5,
+    elevation: 5,
+  },
+  mainBtnText: {
+    color: COLORS.white,
+    fontSize: 20,
     fontFamily: "Kanit_600SemiBold",
   },
-  descBox: { backgroundColor: "#F8F8FF", borderRadius: 10, padding: 12 },
-  descText: { fontSize: 14, color: COLORS.text, lineHeight: 20 },
-  primaryBtn: {
+  backLink: {
+    alignItems: "center",
+    padding: 5,
+  },
+  backLinkText: {
+    color: COLORS.primary,
+    fontSize: 18,
+    fontFamily: "Kanit_700Bold",
+  },
+  underline: {
+    height: 2,
     backgroundColor: COLORS.primary,
-    padding: 14,
-    borderRadius: 12,
-  },
-  disabledBtn: { backgroundColor: "#BDBDBD" },
-  primaryBtnText: {
-    color: "#fff",
-    textAlign: "center",
-    fontFamily: "Kanit_600SemiBold",
-    fontSize: 16,
+    width: "100%",
+    marginTop: 2,
   },
 });

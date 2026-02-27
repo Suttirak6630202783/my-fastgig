@@ -1,10 +1,13 @@
+// app/create.tsx
+import BottomMenu from "@/components/BottomMenu"; // ✅ Import เมนูล่าง
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import React, { useEffect, useState } from "react";
 import {
-  SafeAreaView,
+  ActivityIndicator,
   ScrollView,
+  StatusBar,
   StyleSheet,
   Text,
   TextInput,
@@ -20,19 +23,20 @@ export default function CreateJobsScreen() {
 
   const [title, setTitle] = useState("");
   const [description, setDescription] = useState("");
-  const [jobType, setJobType] = useState(""); // ✅ NEW: job_type state
+  const [jobType, setJobType] = useState("");
   const [payMin, setPayMin] = useState("");
   const [payMax, setPayMax] = useState("");
   const [locationText, setLocationText] = useState("");
   const [ageMin, setAgeMin] = useState("");
   const [ageMax, setAgeMax] = useState("");
+  const [loading, setLoading] = useState(false);
 
   useEffect(() => {
     if (edit && job) {
       const data = JSON.parse(job as string);
       setTitle(data.title);
       setDescription(data.description);
-      setJobType(data.job_type || ""); // ✅ prefill ถ้ามี
+      setJobType(data.job_type || "");
       setPayMin(data.pay_min?.toString() || "");
       setPayMax(data.pay_max?.toString() || "");
       setLocationText(data.location_text || "");
@@ -45,6 +49,7 @@ export default function CreateJobsScreen() {
     if (!title || !description || !payMin)
       return alert("⚠️ กรุณากรอกข้อมูลให้ครบถ้วน");
 
+    setLoading(true);
     try {
       const token = await AsyncStorage.getItem("token");
       await axios.post(
@@ -52,7 +57,7 @@ export default function CreateJobsScreen() {
         {
           title,
           description,
-          job_type: jobType || "ทั่วไป", // ✅ ส่ง job_type เข้า DB
+          job_type: jobType || "ทั่วไป",
           pay_min: payMin,
           pay_max: payMax || payMin,
           location_text: locationText,
@@ -65,12 +70,14 @@ export default function CreateJobsScreen() {
       router.replace("/home");
     } catch (e: any) {
       alert(e.response?.data?.error || "เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
     }
   };
 
-  // ไม่แตะส่วน update ตามคำขอ (แก้เฉพาะตอน create ให้เพิ่ม job_type)
   const handleUpdate = async () => {
     const j = JSON.parse(job as string);
+    setLoading(true);
     try {
       const token = await AsyncStorage.getItem("token");
       await axios.put(
@@ -90,144 +97,230 @@ export default function CreateJobsScreen() {
       router.replace("/home");
     } catch (e: any) {
       alert(e.response?.data?.error || "เกิดข้อผิดพลาด");
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
-    <SafeAreaView style={styles.safe}>
-      <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.title}>{edit ? "แก้ไขงาน" : "สร้างงานใหม่"}</Text>
+    <View style={styles.container}>
+      <StatusBar barStyle="light-content" backgroundColor={COLORS.primary} />
 
+      {/* --- Header สีม่วงโค้งมน --- */}
+      <View style={styles.header}>
+        <Text style={styles.headerTitle}>
+          {edit ? "แก้ไขงาน" : "สร้างงานใหม่"}
+        </Text>
+      </View>
+
+      <ScrollView contentContainerStyle={styles.scrollContent}>
         {/* หัวข้อ */}
         <Text style={styles.label}>หัวข้อ :</Text>
         <TextInput
           style={styles.input}
           value={title}
           onChangeText={setTitle}
-          placeholder="เช่น รับจ้างย้ายของ, ทำความสะอาด"
+          placeholder="ระบุหัวข้อ"
+          placeholderTextColor="#999"
         />
 
         {/* รายละเอียด */}
         <Text style={styles.label}>รายละเอียด :</Text>
         <TextInput
-          style={[styles.input, { height: 100 }]}
+          style={[styles.input, styles.textArea]}
           multiline
           value={description}
           onChangeText={setDescription}
-          placeholder="รายละเอียดของงาน"
+          placeholder="ระบุรายละเอียด"
+          placeholderTextColor="#999"
+          textAlignVertical="top"
         />
 
-        {/* ✅ ประเภทงาน (Job type) */}
-        <Text style={styles.label}>ประเภทงาน (Job type) :</Text>
+        {/* ประเภท */}
+        <Text style={styles.label}>ประเภท :</Text>
         <TextInput
           style={styles.input}
           value={jobType}
           onChangeText={setJobType}
-          placeholder='เช่น "ทั่วไป", "พาร์ทไทม์", "ส่งของ", "แม่บ้าน"'
+          placeholder="ระบุประเภทงาน"
+          placeholderTextColor="#999"
         />
 
         {/* สถานที่ */}
-        <Text style={styles.label}>📍 สถานที่ :</Text>
+        <Text style={styles.label}>สถานที่ :</Text>
         <TextInput
           style={styles.input}
           value={locationText}
           onChangeText={setLocationText}
-          placeholder="เช่น ศรีราชา, ชลบุรี, บ้านเลขที่ 22/3"
+          placeholder="ระบุสถานที่"
+          placeholderTextColor="#999"
         />
 
-        {/* อายุที่ต้องการ */}
-        <Text style={styles.label}>อายุที่ต้องการ :</Text>
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        {/* อายุ (คู่ขนาน) */}
+        <Text style={styles.label}>อายุ :</Text>
+        <View style={styles.row}>
           <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="อายุต่ำสุด (เช่น 18)"
+            style={[styles.input, styles.halfInput]}
+            placeholder="อายุต่ำสุด"
+            placeholderTextColor="#999"
             keyboardType="numeric"
             value={ageMin}
             onChangeText={setAgeMin}
           />
           <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="อายุสูงสุด (เช่น 35)"
+            style={[styles.input, styles.halfInput]}
+            placeholder="อายุสูงสุด"
+            placeholderTextColor="#999"
             keyboardType="numeric"
             value={ageMax}
             onChangeText={setAgeMax}
           />
         </View>
 
-        {/* ค่าจ้าง */}
-        <Text style={styles.label}>💰 ค่าจ้าง :</Text>
-        <View style={{ flexDirection: "row", gap: 8 }}>
+        {/* ค่าจ้าง (คู่ขนาน) */}
+        <Text style={styles.label}>ค่าจ้าง :</Text>
+        <View style={styles.row}>
           <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="ขั้นต่ำ"
+            style={[styles.input, styles.halfInput]}
+            placeholder="ค่าจ้างขั้นต่ำ"
+            placeholderTextColor="#999"
             keyboardType="numeric"
             value={payMin}
             onChangeText={setPayMin}
           />
           <TextInput
-            style={[styles.input, { flex: 1 }]}
-            placeholder="สูงสุด"
+            style={[styles.input, styles.halfInput]}
+            placeholder="ค่าจ้างสูงสุด"
+            placeholderTextColor="#999"
             keyboardType="numeric"
             value={payMax}
             onChangeText={setPayMax}
           />
         </View>
 
-        {/* ปุ่มหลัก */}
+        {/* ปุ่ม Submit */}
         <TouchableOpacity
-          style={styles.primaryBtn}
+          style={styles.submitBtn}
           onPress={edit ? handleUpdate : handleCreate}
+          disabled={loading}
         >
-          <Text style={styles.primaryBtnText}>
-            {edit ? "บันทึกการแก้ไข" : "โพสต์งาน"}
-          </Text>
+          {loading ? (
+            <ActivityIndicator color={COLORS.white} />
+          ) : (
+            <Text style={styles.submitBtnText}>
+              {edit ? "บันทึกการแก้ไข" : "โพสต์งาน"}
+            </Text>
+          )}
         </TouchableOpacity>
 
+        {/* ปุ่มยกเลิก */}
         <TouchableOpacity
           onPress={() => router.back()}
-          style={{ marginTop: 12 }}
+          style={styles.cancelBtnWrapper}
         >
-          <Text style={styles.cancel}>ยกเลิก</Text>
+          <Text style={styles.cancelBtnText}>ยกเลิก</Text>
+          <View style={styles.underline} />
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+
+      {/* เมนูล่าง */}
+      <BottomMenu />
+    </View>
   );
 }
 
 const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: COLORS.white },
-  container: { padding: 20 },
-  title: {
+  container: {
+    flex: 1,
+    backgroundColor: COLORS.background,
+  },
+  // --- Header ---
+  header: {
+    backgroundColor: COLORS.primary,
+    paddingTop: 50,
+    paddingBottom: 20,
+    borderBottomLeftRadius: 30,
+    borderBottomRightRadius: 30,
+    alignItems: "center",
+    marginBottom: 10,
+    width: "100%", // มั่นใจว่าเต็มจอ
+  },
+  headerTitle: {
     fontSize: 22,
-    color: COLORS.primary,
-    marginBottom: 16,
+    color: COLORS.white,
     fontFamily: "Kanit_700Bold",
   },
+
+  // --- Form Content ---
+  scrollContent: {
+    paddingHorizontal: 20, // ลด Padding ลงนิดนึงให้มีที่หายใจ
+    paddingTop: 10,
+    paddingBottom: 100,
+  },
   label: {
-    fontFamily: "Kanit_600SemiBold",
-    marginTop: 12,
-    marginBottom: 4,
-    color: COLORS.text,
+    fontSize: 16,
+    color: COLORS.primary,
+    fontFamily: "Kanit_700Bold",
+    marginBottom: 8,
+    marginTop: 8,
   },
   input: {
-    backgroundColor: "#f9f9f9",
-    borderWidth: 1,
-    borderColor: "#ddd",
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
+    backgroundColor: COLORS.input,
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
     fontSize: 14,
+    fontFamily: "Kanit_400Regular",
+    color: "#333",
+    marginBottom: 12,
+    width: "100%", // ให้ยืดเต็ม Container ของมัน
   },
-  primaryBtn: {
+  textArea: {
+    height: 120,
+  },
+
+  // ✅ แก้ไขส่วน Row ให้เสถียรขึ้น
+  row: {
+    flexDirection: "row",
+    alignItems: "center",
+    width: "100%", // บังคับให้แถวเต็มความกว้างจอ
+    gap: 10,
+  },
+  halfInput: {
+    flex: 1, // แบ่งพื้นที่กันคนละครึ่ง (คำนวณจากพื้นที่ที่เหลือ)
+  },
+
+  // --- Buttons ---
+  submitBtn: {
     backgroundColor: COLORS.primary,
-    padding: 14,
-    borderRadius: 10,
-    marginTop: 20,
+    borderRadius: 15,
+    paddingVertical: 14,
+    alignItems: "center",
+    marginTop: 24,
+    shadowColor: COLORS.primary,
+    shadowOpacity: 0.3,
+    shadowOffset: { width: 0, height: 4 },
+    elevation: 5,
+    width: "100%",
   },
-  primaryBtnText: {
-    color: "#fff",
-    textAlign: "center",
-    fontFamily: "Kanit_600SemiBold",
+  submitBtnText: {
+    color: COLORS.white,
+    fontSize: 18,
+    fontFamily: "Kanit_700Bold",
   },
-  cancel: { textAlign: "center", color: COLORS.sub, marginTop: 8 },
+  cancelBtnWrapper: {
+    alignItems: "center",
+    marginTop: 16,
+  },
+  cancelBtnText: {
+    color: COLORS.primary,
+    fontSize: 16,
+    fontFamily: "Kanit_700Bold",
+  },
+  underline: {
+    height: 2,
+    backgroundColor: COLORS.primary,
+    width: 60,
+    marginTop: 2,
+  },
 });

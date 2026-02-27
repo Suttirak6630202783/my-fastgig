@@ -142,19 +142,19 @@ export default function RegisterScreen() {
 
         <TouchableOpacity style={styles.primaryBtn} onPress={handleRegister}>
           {loading ? (
-            <ActivityIndicator color="#fff" />
+            <ActivityIndicator color={COLORS.white} />
           ) : (
             <Text style={styles.primaryBtnText}>Continue</Text>
           )}
         </TouchableOpacity>
 
         <TouchableOpacity
-          onPress={() => router.push("/")}
+          onPress={() => router.push("/login")}
           style={{ marginTop: 14 }}
         >
           <Text style={styles.link}>
             Do You Have Account?{" "}
-            <Text style={{ color: "#E9E7FF" }}>Sign In</Text>
+            <Text style={{ color: COLORS.accent }}>Sign In</Text>
           </Text>
         </TouchableOpacity>
       </ScrollView>
@@ -167,30 +167,39 @@ const styles = StyleSheet.create({
   container: { flexGrow: 1, justifyContent: "center", padding: 20 },
   logo: {
     fontSize: 32,
-    color: "#fff",
+    color: COLORS.white,
     textAlign: "center",
     fontFamily: "Kanit_800ExtraBold",
   },
   caption: { textAlign: "center", color: "#EAEAF4", marginBottom: 22 },
-  label: { color: "#fff", marginBottom: 6, fontFamily: "Kanit_600SemiBold" },
+  label: {
+    color: COLORS.white,
+    marginBottom: 6,
+    fontFamily: "Kanit_600SemiBold",
+  },
   input: {
-    backgroundColor: "#fff",
+    backgroundColor: COLORS.background,
     borderRadius: 10,
     paddingHorizontal: 12,
     paddingVertical: 10,
-    marginBottom: 10,
+    marginBottom: 12,
+    fontFamily: "Kanit_300Light",
   },
   primaryBtn: {
-    backgroundColor: "#7B61FF",
+    backgroundColor: COLORS.primaryBtn,
     padding: 14,
     borderRadius: 10,
     marginTop: 6,
   },
   primaryBtnText: {
-    color: "#fff",
+    color: COLORS.white,
     textAlign: "center",
     fontFamily: "Kanit_600SemiBold",
     fontSize: 16,
   },
-  link: { color: "#fff", textAlign: "center" },
+  link: {
+    color: COLORS.white,
+    textAlign: "center",
+    fontFamily: "Kanit_400Regular",
+  },
 });

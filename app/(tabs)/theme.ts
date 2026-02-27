@@ -1,6 +1,6 @@
 // app/theme.ts
 export const COLORS = {
-  primary: "#5D3FD3", // ม่วงหลัก
+  primary: "#6D5B93", // ม่วงหลัก
   primaryDark: "#4C34AD",
   accent: "#FFD54F", // เหลืองโลโก้/ไฮไลท์
   badge: "#FBC02D", // เหลือง badge "งานแนะนำ"
@@ -10,4 +10,7 @@ export const COLORS = {
   sub: "#6B7280",
   line: "#E5E7EB",
   white: "#FFFFFF",
+  primaryBtn: "#9E70FF",
+  background: "#F9F9F9",
+  input: "#EFEFEF",
 };
