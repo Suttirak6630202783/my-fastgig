@@ -58,7 +58,7 @@ export default function RegisterScreen() {
         age,
         skills: skillsClean, // NEW
       });
-      router.replace("/");
+      router.replace("/(tabs)/login");
     } catch (e: any) {
       alert(e.response?.data?.error || "เกิดข้อผิดพลาด");
     } finally {

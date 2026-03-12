@@ -165,7 +165,11 @@ app.get("/api/me", auth, async (req, res) => {
           u.created_at,
           IFNULL(u.trust_points,0) AS trust_points,
           IFNULL(u.completed_jobs,0) AS completed_jobs,
-          TRIM(fn_GetTrustLevel(IFNULL(u.trust_points, 0))) AS trust_level
+          CASE
+          WHEN IFNULL(u.trust_points,0) >= 100 THEN 'Gold'
+          WHEN IFNULL(u.trust_points,0) >= 50 THEN 'Silver'
+          ELSE 'Bronze'
+          END AS trust_level
        FROM users AS u
        WHERE u.user_id=?`,
       [req.user.id],
