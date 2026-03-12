@@ -121,7 +121,7 @@ export default function ProfileScreen() {
         (e.response.status === 401 || e.response.status === 403)
       ) {
         await AsyncStorage.multiRemove(["token", "user_id"]);
-        router.replace("/");
+        router.replace("/login");
       }
     }
   };
